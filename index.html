@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LongBuSa IL2CPP Main.cpp Generator (arm64)</title>
+<style>
+    body {
+        font-family: Consolas, monospace;
+        background: #0b0b10;
+        color: #e5e7eb;
+        margin: 0;
+        padding: 16px;
+    }
+    h1 {
+        font-size: 20px;
+        color: #4ade80;
+        margin: 4px 0 8px;
+    }
+    h2 {
+        font-size: 16px;
+        color: #60a5fa;
+        margin: 4px 0 8px;
+    }
+    .card {
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+        background: #111827;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+    }
+    th, td {
+        border-bottom: 1px solid #1f2937;
+        padding: 4px 6px;
+        font-size: 12px;
+        vertical-align: middle;
+    }
+    th {
+        background: #020617;
+    }
+    input, select, button, textarea {
+        font-family: inherit;
+        font-size: 12px;
+    }
+    input, select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 2px 4px;
+        background: #020617;
+        color: #e5e7eb;
+        border: 1px solid #374151;
+        border-radius: 4px;
+    }
+    input::placeholder {
+        color: #6b7280;
+    }
+    .btn {
+        background: #22c55e;
+        border: none;
+        color: #000;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        margin-right: 4px;
+    }
+    .btn.secondary {
+        background: #3b82f6;
+        color: #fff;
+    }
+    .btn.danger {
+        background: #ef4444;
+        color: #fff;
+    }
+    .btn.small {
+        padding: 2px 6px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+    .btn:active {
+        transform: translateY(1px);
+    }
+    textarea {
+        width: 100%;
+        height: 380px;
+        box-sizing: border-box;
+        background: #020617;
+        color: #e5e7eb;
+        border-radius: 6px;
+        border: 1px solid #374151;
+        padding: 8px;
+        resize: vertical;
+        white-space: pre;
+    }
+    .small {
+        font-size: 11px;
+        color: #9ca3af;
+    }
+    .row-actions {
+        text-align: center;
+        white-space: nowrap;
+    }
+</style>
+</head>
+<body>
+
+<h1>LongBuSa – IL2CPP Main.cpp Generator (arm64, libil2cpp.so)</h1>
+<div class="small">
+    Nhập offset + kiểu chức năng → nhấn Generate → lấy full <b>Main.cpp</b>, dán thẳng vào project, khỏi chèn từng block.
+</div>
+
+<div class="card">
+    <h2>1. Khai báo Features</h2>
+    <button class="btn" id="addRowBtn">+ Add Feature</button>
+    <button class="btn secondary" id="generateBtn">Generate Main.cpp</button>
+    <button class="btn danger" id="clearBtn">Clear All</button>
+    <div class="small" style="margin-top:6px;">
+        <b>Giải thích nhanh:</b>
+        <ul>
+            <li><b>Key (Code)</b>: tên biến trong C++ (không dấu, không space), ví dụ: <code>NoGravity</code>, <code>FreeShop</code></li>
+            <li><b>Menu Label</b>: text sau <code>CheckBox_</code> trong menu, ví dụ: <code>No Gravity</code></li>
+            <li><b>Offset</b>: RVA từ Il2CppDumper, ví dụ: <code>0x1DC77A8</code></li>
+            <li><b>Type</b>:
+                <ul>
+                    <li><b>Void: block call</b> → hàm <code>void func(void*)</code>, bật là <code>return;</code> luôn (ApplyGravity, UpdateMovement, Displace...)</li>
+                    <li><b>Bool: force true</b> → getter bool, bật là luôn trả <code>true</code> (AutoRevive...)</li>
+                    <li><b>Bool: force false</b> → getter bool, bật là luôn trả <code>false</code> (IsIAP, CheckImpact...)</li>
+                    <li><b>Float: override</b> → getter float, bật là trả giá trị ở cột Float Value (ReviveTimeout, Speed...)</li>
+                </ul>
+            </li>
+            <li>Mỗi dòng = 1 checkbox riêng trong menu. Nếu muốn 1 checkbox điều khiển 2 hàm thì vẫn phải code tay.</li>
+        </ul>
+    </div>
+
+    <table id="featureTable">
+        <thead>
+        <tr>
+            <th style="width:18%">Key (Code)</th>
+            <th style="width:24%">Menu Label</th>
+            <th style="width:20%">Offset (hex)</th>
+            <th style="width:22%">Type</th>
+            <th style="width:10%">Float Value</th>
+            <th style="width:6%">X</th>
+        </tr>
+        </thead>
+        <tbody id="featureTbody">
+        <!-- Rows sẽ được thêm tự động -->
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>2. Main.cpp Output</h2>
+    <div class="small" style="margin-bottom:4px;">
+        Sau khi Generate, copy tất cả nội dung dưới đây và dán thẳng vào <code>app/src/main/jni/Main.cpp</code> (hoặc file tương ứng).
+    </div>
+    <textarea id="cppOutput" readonly></textarea>
+</div>
+
+<script>
+(function () {
+    const tbody = document.getElementById('featureTbody');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const genBtn = document.getElementById('generateBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const outCpp = document.getElementById('cppOutput');
+
+    function createRow(defaultData = {}) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input class="featKey" placeholder="NoGravity"></td>
+            <td><input class="featLabel" placeholder="No Gravity"></td>
+            <td><input class="featOffset" placeholder="0x1DC77A8"></td>
+            <td>
+                <select class="featType">
+                    <option value="block_void">Void: block call</option>
+                    <option value="bool_true">Bool: force true</option>
+                    <option value="bool_false">Bool: force false</option>
+                    <option value="float_override">Float: override</option>
+                </select>
+            </td>
+            <td><input class="featFloat" placeholder="9999.0"></td>
+            <td class="row-actions">
+                <button class="btn danger small btnDel" type="button">X</button>
+            </td>
+        `;
+        if (defaultData.key) tr.querySelector('.featKey').value = defaultData.key;
+        if (defaultData.label) tr.querySelector('.featLabel').value = defaultData.label;
+        if (defaultData.offset) tr.querySelector('.featOffset').value = defaultData.offset;
+        if (defaultData.type) tr.querySelector('.featType').value = defaultData.type;
+        if (defaultData.floatValue) tr.querySelector('.featFloat').value = defaultData.floatValue;
+
+        tr.querySelector('.btnDel').addEventListener('click', () => {
+            tbody.removeChild(tr);
+        });
+
+        tbody.appendChild(tr);
+    }
+
+    addRowBtn.addEventListener('click', () => createRow());
+
+    clearBtn.addEventListener('click', () => {
+        tbody.innerHTML = '';
+        outCpp.value = '';
+    });
+
+    // vài mẫu sẵn cho Subway (có thể sửa/xóa tùy ý)
+    createRow({
+        key: 'NoGravity',
+        label: 'No Gravity',
+        offset: '0x1DC77A8',
+        type: 'block_void'
+    });
+    createRow({
+        key: 'FreezeCharacter',
+        label: 'Freeze Character',
+        offset: '0x1DED278',
+        type: 'block_void'
+    });
+    createRow({
+        key: 'FreeShop',
+        label: 'Free Shop',
+        offset: '0x39F4EB8',
+        type: 'bool_false'
+    });
+
+    function sanitizeKey(raw) {
+        return raw.replace(/[^a-zA-Z0-9_]/g, '');
+    }
+
+    genBtn.addEventListener('click', () => {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        if (!rows.length) {
+            alert('Chưa có feature nào, thêm ít nhất 1 dòng.');
+            return;
+        }
+
+        const features = [];
+        rows.forEach((tr, index) => {
+            const keyRaw   = tr.querySelector('.featKey').value.trim();
+            const labelRaw = tr.querySelector('.featLabel').value.trim();
+            const offset   = tr.querySelector('.featOffset').value.trim();
+            const type     = tr.querySelector('.featType').value;
+            const floatVal = tr.querySelector('.featFloat').value.trim() || '9999.0';
+
+            if (!keyRaw || !labelRaw || !offset) return;
+            const key = sanitizeKey(keyRaw);
+            if (!key) return;
+
+            features.push({
+                idx: index,
+                key,
+                label: labelRaw,
+                offset,
+                type,
+                floatVal
+            });
+        });
+
+        if (!features.length) {
+            alert('Data chưa hợp lệ (thiếu key/label/offset).');
+            return;
+        }
+
+        // ========== BUILD CODE ==========
+
+        // 1) INCLUDES
+        let cpp = `// AUTO GENERATED MOD MENU CORE (LGL Compatible) – by LongBuSa Tool
+// Generated Main.cpp – chỉ việc copy & dán vào project
+
+#include <list>
+#include <vector>
+#include <string>
+#include <cstring>
+#include <pthread.h>
+#include <thread>
+#include <jni.h>
+#include <unistd.h>
+#include <fstream>
+#include <iostream>
+#include <dlfcn.h>
+#include <EGL/egl.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <math.h>
+
+#include "dobby/dobby.h"
+#include "Includes/Logger.h"
+#include "Includes/obfuscate.h"
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_additional.h"
+#include "imgui/backends/imgui_impl_android.h"
+#include "imgui/backends/imgui_impl_opengl3.h"
+#include "imgui/android_native_app_glue.h"
+
+#include "Includes/Utils.hpp"
+#include "Menu/Menu.hpp"
+#include "Menu/Jni.hpp"
+#include "AutoHook/AutoHook.h"
+#include "Includes/Macros.h"
+#include "KittyMemory/MemoryPatch.h"
+
+`;
+
+        // 2) OFFSETS
+        cpp += `
+// ======================================================
+// OFFSETS ARM64 – AUTO GENERATED
+// ======================================================
+
+`;
+        features.forEach(f => {
+            cpp += `#define OFF_${f.key} ${f.offset}  // ${f.label}\n`;
+        });
+
+        // 3) LOG TO TXT
+        cpp += `
+
+// ======================================================
+// LOG TO TXT
+// ======================================================
+
+static const char *kLogPath = "/sdcard/Download/LongBuSa_Subway_Log.txt";
+
+void LogToTxt(const char *fmt, ...) {
+    FILE *fp = fopen(kLogPath, "a");
+    if (!fp) return;
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(fp, fmt, args);
+    va_end(args);
+
+    fprintf(fp, "\\n");
+    fclose(fp);
+}
+
+`;
+
+        // 4) GLOBALS
+        cpp += `
+// ======================================================
+// GLOBALS
+// ======================================================
+
+int glWidth = 0, glHeight = 0;
+bool g_Initialized = false;
+void *m_EGL = nullptr;
+uintptr_t g_IL2Cpp = 0;
+
+EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface) = nullptr;
+
+// Feature toggles
+`;
+
+        features.forEach(f => {
+            cpp += `bool g_${f.key} = false;\n`;
+        });
+        cpp += `\n`;
+
+        // orig ptrs
+        cpp += `// Original function pointers per feature\n`;
+        features.forEach(f => {
+            if (f.type === 'block_void') {
+                cpp += `void (*orig_${f.key})(void *instance) = nullptr;\n`;
+            } else if (f.type === 'bool_true' || f.type === 'bool_false') {
+                cpp += `bool (*orig_${f.key})(void *instance) = nullptr;\n`;
+            } else if (f.type === 'float_override') {
+                cpp += `float (*orig_${f.key})(void *instance) = nullptr;\n`;
+            }
+        });
+
+        cpp += `
+
+// ======================================================
+// GAME HOOKS (AUTO)
+// ======================================================
+
+`;
+
+        // 5) HOOK FUNCTIONS
+        features.forEach(f => {
+            const hookName = `${f.key}_Hook`;
+            cpp += `// Hook for ${f.label} (${f.key})\n`;
+            if (f.type === 'block_void') {
+                cpp += `void ${hookName}(void *instance) {\n`;
+                cpp += `    if (g_${f.key}) {\n`;
+                cpp += `        // Block original call when enabled\n`;
+                cpp += `        return;\n`;
+                cpp += `    }\n`;
+                cpp += `    if (orig_${f.key}) orig_${f.key}(instance);\n`;
+                cpp += `}\n\n`;
+            } else if (f.type === 'bool_true') {
+                cpp += `bool ${hookName}(void *instance) {\n`;
+                cpp += `    if (g_${f.key}) {\n`;
+                cpp += `        // Force TRUE when enabled\n`;
+                cpp += `        return true;\n`;
+                cpp += `    }\n`;
+                cpp += `    return orig_${f.key} ? orig_${f.key}(instance) : false;\n`;
+                cpp += `}\n\n`;
+            } else if (f.type === 'bool_false') {
+                cpp += `bool ${hookName}(void *instance) {\n`;
+                cpp += `    if (g_${f.key}) {\n`;
+                cpp += `        // Force FALSE when enabled\n`;
+                cpp += `        return false;\n`;
+                cpp += `    }\n`;
+                cpp += `    return orig_${f.key} ? orig_${f.key}(instance) : false;\n`;
+                cpp += `}\n\n`;
+            } else if (f.type === 'float_override') {
+                cpp += `float ${hookName}(void *instance) {\n`;
+                cpp += `    if (g_${f.key}) {\n`;
+                cpp += `        // Override float value when enabled\n`;
+                cpp += `        return ${f.floatVal}f;\n`;
+                cpp += `    }\n`;
+                cpp += `    return orig_${f.key} ? orig_${f.key}(instance) : 0.0f;\n`;
+                cpp += `}\n\n`;
+            }
+        });
+
+        // 6) ESP / IMGUI (LED banner như bản của bạn)
+        cpp += `
+// ======================================================
+// ESP / IMGUI
+// ======================================================
+
+void DrawESP(int screenWidth, int screenHeight) {
+    ImDrawList *draw = ImGui::GetBackgroundDrawList();
+    if (!draw) return;
+
+    const char* text = "LongBuSa Subway Mod";
+
+    float t = (float)ImGui::GetTime();
+
+    float baseFontSize = ImGui::GetFont()->FontSize;
+    float fontSize     = baseFontSize * 1.4f;
+    float scale        = fontSize / baseFontSize;
+
+    ImVec2 baseSize = ImGui::CalcTextSize(text);
+    ImVec2 textSize = ImVec2(baseSize.x * scale, baseSize.y * scale);
+
+    ImVec2 pos(
+        screenWidth  / 2.0f - textSize.x / 2.0f,
+        80.0f
+    );
+
+    ImVec2 padding(24.0f, 12.0f);
+    ImVec2 rectMin = ImVec2(pos.x - padding.x, pos.y - padding.y);
+    ImVec2 rectMax = ImVec2(pos.x + textSize.x + padding.x, pos.y + textSize.y + padding.y);
+
+    ImU32 bgColor = IM_COL32(0, 0, 0, 180);
+    draw->AddRectFilled(rectMin, rectMax, bgColor, 14.0f);
+
+    float hue = fmodf(t * 0.25f, 1.0f);
+    ImColor borderCol = ImColor::HSV(hue, 1.0f, 1.0f);
+    draw->AddRect(rectMin, rectMax, borderCol, 14.0f, 0, 3.0f);
+
+    ImColor mainCol = ImColor::HSV(hue, 1.0f, 1.0f);
+    float blink = 0.7f + 0.3f * sinf(t * 5.0f);
+    ImVec4 v = mainCol.Value;
+    v.w = blink;
+    mainCol = ImColor(v);
+
+    ImU32 outlineCol = IM_COL32(0, 0, 0, 255);
+    ImVec2 o1 = ImVec2(1.5f, 1.5f);
+    ImVec2 o2 = ImVec2(-1.5f, 1.5f);
+    ImVec2 o3 = ImVec2(1.5f, -1.5f);
+    ImVec2 o4 = ImVec2(-1.5f, -1.5f);
+
+    draw->AddText(nullptr, fontSize, ImVec2(pos.x + o1.x, pos.y + o1.y), outlineCol, text);
+    draw->AddText(nullptr, fontSize, ImVec2(pos.x + o2.x, pos.y + o2.y), outlineCol, text);
+    draw->AddText(nullptr, fontSize, ImVec2(pos.x + o3.x, pos.y + o3.y), outlineCol, text);
+    draw->AddText(nullptr, fontSize, ImVec2(pos.x + o4.x, pos.y + o4.y), outlineCol, text);
+
+    draw->AddText(nullptr, fontSize, pos, mainCol, text);
+}
+
+EGLBoolean _eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
+    eglQuerySurface(dpy, surface, EGL_WIDTH,  &glWidth);
+    eglQuerySurface(dpy, surface, EGL_HEIGHT, &glHeight);
+
+    if (glWidth <= 0 || glHeight <= 0) {
+        return orig_eglSwapBuffers
+               ? orig_eglSwapBuffers(dpy, surface)
+               : eglSwapBuffers(dpy, surface);
+    }
+
+    if (!g_Initialized) {
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+        ImGuiIO &io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+
+        ImGui_ImplAndroid_Init();
+        ImGui_ImplOpenGL3_Init("#version 300 es");
+
+        g_Initialized = true;
+        LogToTxt("ImGui initialized (w=%d, h=%d)", glWidth, glHeight);
+    }
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplAndroid_NewFrame(glWidth, glHeight);
+    ImGui::NewFrame();
+
+    DrawESP(glWidth, glHeight);
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    return orig_eglSwapBuffers
+           ? orig_eglSwapBuffers(dpy, surface)
+           : eglSwapBuffers(dpy, surface);
+}
+
+`;
+
+        // 7) MENU JNI: GetFeatureList + Changes
+        cpp += `
+// ======================================================
+// MENU JNI
+// ======================================================
+
+jobjectArray GetFeatureList(JNIEnv *env, jobject context) {
+    const char *features[] = {
+        OBFUSCATE("Category: LongBuSa Subway")`;
+
+        features.forEach((f, i) => {
+            const featNum = i + 1;
+            cpp += `,
+        OBFUSCATE("CheckBox_${f.label}") // case ${featNum}`;
+        });
+
+        cpp += `
+    };
+
+    int total = sizeof(features) / sizeof(features[0]);
+    jobjectArray ret = env->NewObjectArray(
+        total,
+        env->FindClass(OBFUSCATE("java/lang/String")),
+        env->NewStringUTF("")
+    );
+
+    for (int i = 0; i < total; i++) {
+        env->SetObjectArrayElement(ret, i, env->NewStringUTF(features[i]));
+    }
+
+    return ret;
+}
+
+void Changes(JNIEnv *env, jclass clazz, jobject obj,
+             jint featNum, jstring featName,
+             jint value, jlong Lvalue,
+             jboolean boolean, jstring text) {
+
+    LogToTxt("Changes called: featNum=%d, bool=%d", featNum, boolean ? 1 : 0);
+
+    switch (featNum) {
+`;
+
+        features.forEach((f, i) => {
+            const featNum = i + 1;
+            cpp += `        case ${featNum}: g_${f.key} = boolean; break;  // ${f.label}\n`;
+        });
+
+        cpp += `        default:
+            // LGL internal (-1, -3, ...) => bỏ qua
+            break;
+    }
+}
+
+`;
+
+        // 8) IL2CPP / ELF + hack_thread
+        cpp += `
+// ======================================================
+// IL2CPP / ELF & HACK THREAD
+// ======================================================
+
+#define targetLibName OBFUSCATE("libil2cpp.so")
+ElfScanner g_il2cppELF;
+
+static bool g_threadStarted = false;
+
+void *hack_thread(void *) {
+    if (g_threadStarted) {
+        return nullptr;
+    }
+    g_threadStarted = true;
+
+    LOGI("pthread created");
+    LogToTxt("========== LongBuSa Subway hack_thread START ==========");
+
+    // chờ libil2cpp.so
+    do {
+        sleep(1);
+        g_il2cppELF = ElfScanner::createWithPath(targetLibName);
+    } while (!g_il2cppELF.isValid());
+
+    g_IL2Cpp = g_il2cppELF.base();
+    LogToTxt("ElfScanner OK, base = 0x%lX", (unsigned long)g_IL2Cpp);
+
+    // chờ libEGL
+    while (!m_EGL) {
+        m_EGL = dlopen("libEGL.so", RTLD_NOW);
+        sleep(1);
+    }
+    LogToTxt("dlopen libEGL.so OK");
+
+    // hook eglSwapBuffers
+    void *swapAddr = dlsym(m_EGL, OBFUSCATE("eglSwapBuffers"));
+    if (swapAddr) {
+        if (DobbyHook(swapAddr, (void *)_eglSwapBuffers,
+                      (void **)&orig_eglSwapBuffers) == RT_SUCCESS) {
+            LogToTxt("Hook eglSwapBuffers done");
+        } else {
+            LogToTxt("Hook eglSwapBuffers FAILED");
+        }
+    } else {
+        LogToTxt("dlsym eglSwapBuffers FAILED");
+    }
+
+#if defined(__aarch64__)
+    LogToTxt("=== Begin arm64 hooks by offsets ===");
+
+    auto hook64 = [](uintptr_t off, void *hook, void **orig, const char *name) {
+        if (!off) {
+            LogToTxt("Skip %s: offset == 0", name);
+            return;
+        }
+        void *addr = (void *)(g_IL2Cpp + off);
+        LogToTxt("Try hook %s at 0x%lX", name, (unsigned long)addr);
+        if (DobbyHook(addr, hook, orig) == RT_SUCCESS) {
+            LogToTxt("DobbyHook %s OK", name);
+        } else {
+            LogToTxt("DobbyHook %s FAILED", name);
+        }
+    };
+
+`;
+
+        features.forEach(f => {
+            const hookName = `${f.key}_Hook`;
+            cpp += `    hook64(OFF_${f.key}, (void *)${hookName}, (void **)&orig_${f.key}, "${f.key}");\n`;
+        });
+
+        cpp += `
+    LogToTxt("=== End arm64 hooks by offsets ===");
+#endif
+
+    LogToTxt("hack_thread END");
+    LOGI("Done");
+    return nullptr;
+}
+
+// ======================================================
+// ENTRY
+// ======================================================
+
+__attribute__((constructor))
+void lib_main() {
+    pthread_t ptid;
+    pthread_create(&ptid, nullptr, hack_thread, nullptr);
+}
+
+`;
+
+        outCpp.value = cpp;
+    });
+
+})();
+</script>
+
+</body>
+</html>
