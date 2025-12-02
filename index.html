@@ -279,8 +279,7 @@
         <p class="subtitle">IL2CPP Main.cpp Maker (Arm64)</p>
     </header>
 
-    <div id="featureList">
-        </div>
+    <div id="featureList"></div>
 
     <div class="output-section">
         <div class="output-header">
@@ -306,7 +305,6 @@
     const outCpp = document.getElementById('cppOutput');
     const toast = document.getElementById('toast');
 
-    // Mẫu cấu trúc card
     function createCard(data = {}) {
         const div = document.createElement('div');
         div.className = 'feature-card';
@@ -334,43 +332,51 @@
                         <option value="block_void" ${data.type === 'block_void' ? 'selected' : ''}>Void (Chặn gọi)</option>
                         <option value="bool_true" ${data.type === 'bool_true' ? 'selected' : ''}>Bool (Luôn True)</option>
                         <option value="bool_false" ${data.type === 'bool_false' ? 'selected' : ''}>Bool (Luôn False)</option>
-                        <option value="float_override" ${data.type === 'float_override' ? 'selected' : ''}>Float (Gán số)</option>
+                        <option value="bool_invert" ${data.type === 'bool_invert' ? 'selected' : ''}>Bool (Đảo kết quả)</option>
+                        <option value="float_override" ${data.type === 'float_override' ? 'selected' : ''}>Float (Return = Giá trị)</option>
+                        <option value="int_override" ${data.type === 'int_override' ? 'selected' : ''}>Int (Return = Giá trị)</option>
+                        <option value="void_set_float" ${data.type === 'void_set_float' ? 'selected' : ''}>Void + Float arg1 (Gán giá trị)</option>
+                        <option value="void_set_int" ${data.type === 'void_set_int' ? 'selected' : ''}>Void + Int arg1 (Gán giá trị)</option>
+                        <option value="int_outbool_damage" ${data.type === 'int_outbool_damage' ? 'selected' : ''}>DamageAtk (int + out bool)</option>
                     </select>
                 </div>
                 <div class="input-group">
-                    <label>Giá trị Float</label>
+                    <label>Giá trị số (Float/Int/Multiplier)</label>
                     <input type="number" class="featFloat" placeholder="999.0" value="${data.floatVal || '9999.0'}">
                 </div>
             </div>
         `;
 
-        // Xử lý nút xoá
         div.querySelector('.btn-remove').addEventListener('click', () => {
-            if(confirm('Xoá feature này?')) {
+            if (confirm('Xoá feature này?')) {
                 div.remove();
                 renumberCards();
             }
         });
 
-        // Ẩn/Hiện ô nhập Float dựa trên Type
         const typeSelect = div.querySelector('.featType');
-        const floatInput = div.querySelector('.featFloat').closest('.input-group');
+        const floatInputGroup = div.querySelector('.featFloat').closest('.input-group');
         
         function toggleFloat() {
-            if (typeSelect.value === 'float_override') {
-                floatInput.style.opacity = '1';
-                floatInput.style.pointerEvents = 'auto';
+            const needNumber = [
+                'float_override',
+                'int_override',
+                'void_set_int',
+                'void_set_float',
+                'int_outbool_damage'
+            ];
+            if (needNumber.includes(typeSelect.value)) {
+                floatInputGroup.style.opacity = '1';
+                floatInputGroup.style.pointerEvents = 'auto';
             } else {
-                floatInput.style.opacity = '0.3';
-                floatInput.style.pointerEvents = 'none';
+                floatInputGroup.style.opacity = '0.3';
+                floatInputGroup.style.pointerEvents = 'none';
             }
         }
         typeSelect.addEventListener('change', toggleFloat);
-        toggleFloat(); // init
+        toggleFloat();
 
         featureList.appendChild(div);
-        
-        // Scroll to new item
         div.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
@@ -395,7 +401,6 @@
     createCard({ key: 'NoGravity', label: 'No Gravity', offset: '0x1DC77A8', type: 'block_void' });
     createCard({ key: 'FreeShop', label: 'Free Shop', offset: '0x39F4EB8', type: 'bool_false' });
 
-    // Events
     btnAdd.addEventListener('click', () => createCard());
 
     copyBtn.addEventListener('click', () => {
@@ -407,7 +412,6 @@
         });
     });
 
-    // GENERATE LOGIC (Giữ nguyên logic cũ, chỉ thay đổi cách lấy DOM)
     btnGen.addEventListener('click', () => {
         const cards = Array.from(document.querySelectorAll('.feature-card'));
         if (!cards.length) {
@@ -427,7 +431,7 @@
 
             if (!keyRaw || !labelRaw || !offset) {
                 hasError = true;
-                card.style.border = '1px solid #ef4444'; // Mark error
+                card.style.border = '1px solid #ef4444';
                 return;
             } else {
                 card.style.border = '1px solid var(--border)';
@@ -448,7 +452,6 @@
             return;
         }
 
-        // --- BEGIN GENERATION STRING (Logic cũ) ---
         let cpp = `// AUTO GENERATED MOD MENU CORE (LGL Compatible) – by LongBuSa Tool
 // Copy & Paste into Main.cpp
 
@@ -518,15 +521,29 @@ void LogToTxt(const char *fmt, ...) {
 }
 `;
 
+        // globals & original function pointers
         features.forEach(f => {
             cpp += `bool g_${f.key} = false;\n`;
-            if (f.type === 'block_void') cpp += `void (*orig_${f.key})(void *instance) = nullptr;\n`;
-            else if (f.type.includes('bool')) cpp += `bool (*orig_${f.key})(void *instance) = nullptr;\n`;
-            else if (f.type === 'float_override') cpp += `float (*orig_${f.key})(void *instance) = nullptr;\n`;
+            if (f.type === 'block_void') {
+                cpp += `void (*orig_${f.key})(void *instance) = nullptr;\n`;
+            } else if (f.type === 'void_set_int') {
+                cpp += `void (*orig_${f.key})(void *instance, int value) = nullptr;\n`;
+            } else if (f.type === 'void_set_float') {
+                cpp += `void (*orig_${f.key})(void *instance, float value) = nullptr;\n`;
+            } else if (f.type === 'bool_true' || f.type === 'bool_false' || f.type === 'bool_invert') {
+                cpp += `bool (*orig_${f.key})(void *instance) = nullptr;\n`;
+            } else if (f.type === 'float_override') {
+                cpp += `float (*orig_${f.key})(void *instance) = nullptr;\n`;
+            } else if (f.type === 'int_override') {
+                cpp += `int (*orig_${f.key})(void *instance) = nullptr;\n`;
+            } else if (f.type === 'int_outbool_damage') {
+                cpp += `int (*orig_${f.key})(void *Data, void *target, void *sdo, int skill_enhance, double skillPowerRate, bool *isMiss) = nullptr;\n`;
+            }
         });
 
         cpp += `\n// ================== HOOKS ==================\n`;
 
+        // hook bodies
         features.forEach(f => {
             const hookName = `${f.key}_Hook`;
             if (f.type === 'block_void') {
@@ -535,12 +552,28 @@ void LogToTxt(const char *fmt, ...) {
                 cpp += `bool ${hookName}(void *instance) {\n    if (g_${f.key}) return true;\n    return orig_${f.key} ? orig_${f.key}(instance) : false;\n}\n`;
             } else if (f.type === 'bool_false') {
                 cpp += `bool ${hookName}(void *instance) {\n    if (g_${f.key}) return false;\n    return orig_${f.key} ? orig_${f.key}(instance) : false;\n}\n`;
+            } else if (f.type === 'bool_invert') {
+                cpp += `bool ${hookName}(void *instance) {\n    bool ret = orig_${f.key} ? orig_${f.key}(instance) : false;\n    if (g_${f.key}) return !ret;\n    return ret;\n}\n`;
             } else if (f.type === 'float_override') {
                 cpp += `float ${hookName}(void *instance) {\n    if (g_${f.key}) return ${f.floatVal}f;\n    return orig_${f.key} ? orig_${f.key}(instance) : 0.0f;\n}\n`;
+            } else if (f.type === 'int_override') {
+                cpp += `int ${hookName}(void *instance) {\n    if (g_${f.key}) return (int)${f.floatVal};\n    return orig_${f.key} ? orig_${f.key}(instance) : 0;\n}\n`;
+            } else if (f.type === 'void_set_int') {
+                cpp += `void ${hookName}(void *instance, int value) {\n    if (g_${f.key}) value = (int)${f.floatVal};\n    if (orig_${f.key}) orig_${f.key}(instance, value);\n}\n`;
+            } else if (f.type === 'void_set_float') {
+                cpp += `void ${hookName}(void *instance, float value) {\n    if (g_${f.key}) value = ${f.floatVal}f;\n    if (orig_${f.key}) orig_${f.key}(instance, value);\n}\n`;
+            } else if (f.type === 'int_outbool_damage') {
+                cpp += `int ${hookName}(void *Data, void *target, void *sdo, int skill_enhance, double skillPowerRate, bool *isMiss) {\n`;
+                cpp += `    int result = orig_${f.key} ? orig_${f.key}(Data, target, sdo, skill_enhance, skillPowerRate, isMiss) : 0;\n`;
+                cpp += `    if (g_${f.key}) {\n`;
+                cpp += `        if (isMiss) *isMiss = false; // không cho miss\n`;
+                cpp += `        result = (int)(result * ${f.floatVal}f); // nhân damage theo Gi\u00e1 tr\u1ecb s\u1ed1\n`;
+                cpp += `    }\n`;
+                cpp += `    return result;\n`;
+                cpp += `}\n`;
             }
         });
 
-        // ESP Part skipped to save space, focus on logic
         cpp += `
 // ================== EGL & MENU ==================
 
@@ -561,7 +594,6 @@ EGLBoolean _eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
         ImGui_ImplAndroid_NewFrame(glWidth, glHeight);
         ImGui::NewFrame();
         
-        // Draw Watermark / ESP here
         ImGui::GetBackgroundDrawList()->AddText(ImGui::GetFont(), 20.0f, ImVec2(50, 50), IM_COL32(255, 0, 0, 255), "LongBuSa Mod");
 
         ImGui::Render();
@@ -608,7 +640,7 @@ void *hack_thread(void *) {
     #if defined(__aarch64__)
 `;
         features.forEach(f => {
-             cpp += `    DobbyHook((void *)(g_IL2Cpp + OFF_${f.key}), (void *)${f.key}_Hook, (void **)&orig_${f.key});\n`;
+            cpp += `    DobbyHook((void *)(g_IL2Cpp + OFF_${f.key}), (void *)${f.key}_Hook, (void **)&orig_${f.key});\n`;
         });
         cpp += `    #endif
     return nullptr;
@@ -620,12 +652,9 @@ __attribute__((constructor)) void lib_main() {
 }`;
 
         outCpp.value = cpp;
-        
-        // Scroll to output
         document.querySelector('.output-section').scrollIntoView({ behavior: 'smooth' });
         showToast('Generate thành công!');
     });
-
 </script>
 </body>
 </html>
